@@ -1,4 +1,4 @@
-name: Build Vendor Image (Local Repo)
+name: Build Vendor Image
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 🧹 Checkout current repo
+    - name: 🧹 Checkout this repo
       uses: actions/checkout@v4
 
     - name: 🧱 Install full AOSP dependencies
@@ -17,40 +17,37 @@ jobs:
         sudo apt-get install -y bc bison build-essential curl flex g++-multilib gcc-multilib \
           git gnupg gperf libxml2-utils make python3 rsync unzip zip zlib1g-dev
 
-    - name: 🧩 Setup AOSP base directories
+
+    - name: 🧩 Prepare AOSP tree
       run: |
         mkdir -p ~/aosp
         cd ~/aosp
 
-        echo "📦 Cloning minimal AOSP build components..."
+        echo "📦 Cloning essential AOSP components..."
         git clone --depth=1 https://android.googlesource.com/platform/build build
+        git clone --depth=1 https://android.googlesource.com/platform/build/make make
         git clone --depth=1 https://android.googlesource.com/platform/system/core system/core
 
         echo "📁 Copying local device tree..."
         mkdir -p device/generic
         cp -r $GITHUB_WORKSPACE device/generic/sdm845
 
-        echo "📁 Checking vendor folder..."
-        if [ -d "$GITHUB_WORKSPACE/vendor" ]; then
-          echo "✅ Found vendor folder in repo"
-          cp -r $GITHUB_WORKSPACE/vendor ~/aosp/vendor
-        else
-          echo "⚠️ No vendor folder found, creating empty vendor structure"
-          mkdir -p ~/aosp/vendor/generic
-          touch ~/aosp/vendor/generic/Android.mk
-        fi
+        echo "📁 Setting up minimal vendor tree..."
+        mkdir -p vendor/generic
+        touch vendor/generic/Android.mk
 
     - name: ⚙️ Build vendor image
       run: |
         cd ~/aosp
         echo "🚀 Building vendor image for beryllium..."
-        source build/envsetup.sh || true
+        source build/envsetup.sh || source make/envsetup.sh
         export PATH=$PATH:~/aosp/build/tools
         lunch beryllium-userdebug || true
         make vendorimage -j$(nproc) || echo "⚠️ Partial build complete"
 
-    - name: 📦 Upload vendor.img artifact
+    - name: 📦 Upload vendor.img
       uses: actions/upload-artifact@v4
       with:
         name: vendor-image
         path: ~/aosp/out/target/product/beryllium/vendor.img
+        if-no-files-found: warn

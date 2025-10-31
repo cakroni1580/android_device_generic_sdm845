@@ -5,40 +5,45 @@ on:
 
 jobs:
   build-vendor:
+    name: Build vendor.img for Beryllium
     runs-on: ubuntu-22.04
+
     steps:
-      - name: Checkout
+      - name: Checkout current repo
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git-core make python3 \
-            e2fsprogs simg2img mtools mkbootimg \
-            bc bison flex zip curl wget ca-certificates \
+          sudo apt-get install -y git-core make python3 e2fsprogs simg2img \
+            mtools mkbootimg bc bison flex zip curl wget ca-certificates \
             build-essential ccache libssl-dev rsync
 
-      - name: Set up directories
+      - name: Prepare minimal source tree
         run: |
           mkdir -p ~/aosp-repo
           cd ~/aosp-repo
+
+          echo "📦 Cloning minimal AOSP build components..."
           git clone --depth=1 https://android.googlesource.com/platform/build build
           git clone --depth=1 https://android.googlesource.com/platform/system/core system/core
+
+          echo "📦 Cloning device and vendor trees..."
           git clone --depth=1 https://github.com/aospm/android_device_generic_sdm845.git device/generic/sdm845
           git clone --depth=1 https://github.com/aospm/android_vendor_generic.git vendor/generic
 
-      - name: Build vendor image (beryllium)
+          mkdir -p out/target/product/beryllium/vendor
+          # Copy your firmware or blobs here if needed
+          # cp -r path/to/a630_* out/target/product/beryllium/vendor/firmware/
+
+      - name: Build vendor.img (ext4)
         run: |
           cd ~/aosp-repo
-          export TARGET_PRODUCT=beryllium
-          export TARGET_BUILD_VARIANT=userdebug
-          export OUT_DIR=$(pwd)/out
-          mkdir -p $OUT_DIR/target/product/beryllium/vendor
-          echo "Building vendor image..."
-          make_ext4fs -s -T 0 -l 1073741824 -a vendor $OUT_DIR/vendor.img $OUT_DIR/target/product/beryllium/vendor
-          echo "✅ Vendor image built: $OUT_DIR/vendor.img"
+          echo "🔧 Building vendor image..."
+          make_ext4fs -s -T 0 -l 1073741824 -a vendor out/vendor.img out/target/product/beryllium/vendor
+          ls -lh out/vendor.img
 
-      - name: Upload vendor.img
+      - name: Upload vendor.img artifact
         uses: actions/upload-artifact@v4
         with:
           name: vendor-beryllium

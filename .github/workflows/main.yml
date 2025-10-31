@@ -1,25 +1,28 @@
-name: Build Vendor (Beryllium SDM845)
+name: Build Minimal Vendor (beryllium)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
 
 jobs:
   build-vendor:
-    name: Build vendor.img for Beryllium
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout current repo
+      - name: 🧩 Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: 🧰 Setup build environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y git-core make python3 e2fsprogs simg2img \
-            mtools mkbootimg bc bison flex zip curl wget ca-certificates \
-            build-essential ccache libssl-dev rsync
+          sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
+            gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev \
+            libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip bc python3
 
-      - name: Prepare minimal source tree
+      - name: 🏗️ Clone AOSP base components
         run: |
           mkdir -p ~/aosp-repo
           cd ~/aosp-repo
@@ -30,21 +33,29 @@ jobs:
 
           echo "📦 Cloning device and vendor trees..."
           git clone --depth=1 https://github.com/aospm/android_device_generic_sdm845.git device/generic/sdm845
-          git clone --depth=1 https://github.com/aospm/android_vendor_generic.git vendor/generic
+          git clone --depth=1 https://github.com/aospm/android_vendor_generic.git vendor/generic || \
+            (echo "⚠️ vendor repo mungkin private, coba pakai token nanti" && exit 1)
 
           mkdir -p out/target/product/beryllium/vendor
-          # Copy your firmware or blobs here if needed
-          # cp -r path/to/a630_* out/target/product/beryllium/vendor/firmware/
 
-      - name: Build vendor.img (ext4)
+      - name: 🧩 Set up environment & build vendor image
         run: |
           cd ~/aosp-repo
-          echo "🔧 Building vendor image..."
-          make_ext4fs -s -T 0 -l 1073741824 -a vendor out/vendor.img out/target/product/beryllium/vendor
-          ls -lh out/vendor.img
+          source build/envsetup.sh || true
 
-      - name: Upload vendor.img artifact
+          echo "🔧 Generating makefiles..."
+          lunch beryllium-userdebug || true
+
+          echo "⚙️ Building vendor image..."
+          make vendorimage -j$(nproc)
+
+      - name: 📦 Collect build artifacts
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/output
+          cp -a ~/aosp-repo/out/target/product/beryllium/vendor.img $GITHUB_WORKSPACE/output/vendor.img || true
+
+      - name: 🚀 Upload vendor image
         uses: actions/upload-artifact@v4
         with:
           name: vendor-beryllium
-          path: ~/aosp-repo/out/vendor.img
+          path: output/vendor.img

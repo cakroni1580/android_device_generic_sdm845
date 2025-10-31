@@ -1,21 +1,13 @@
-name: Build Minimal Vendor (beryllium)
+name: Build Vendor Image (Beryllium SDM845)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
 
 jobs:
-  build-vendor:
-    runs-on: ubuntu-latest
-
+  build:
+    runs-on: ubuntu-24.04
     steps:
-      - name: 🧩 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🧰 Setup build environment
+      - name: 🧰 Setup environment
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
@@ -24,7 +16,10 @@ jobs:
             x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc \
             unzip bc python3
 
-      - name: 🏗️ Clone AOSP base components
+      - name: 📂 Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Prepare AOSP directories
         run: |
           mkdir -p ~/aosp-repo
           cd ~/aosp-repo
@@ -34,30 +29,23 @@ jobs:
           git clone --depth=1 https://android.googlesource.com/platform/system/core system/core
 
           echo "📦 Cloning device and vendor trees..."
-          git clone --depth=1 https://github.com/aospm/android_device_generic_sdm845.git device/generic/sdm845
+          git clone --depth=1 https://github.com/cakroni1580/android_device_generic_sdm845.git device/generic/sdm845
           git clone --depth=1 https://github.com/aospm/android_vendor_generic.git vendor/generic || \
-            (echo "⚠️ vendor repo mungkin private, coba pakai token nanti" && exit 1)
+            git clone --depth=1 https://${{ secrets.GITHUB_TOKEN }}@github.com/aospm/android_vendor_generic.git vendor/generic
 
           mkdir -p out/target/product/beryllium/vendor
 
-      - name: 🧩 Set up environment & build vendor image
+      - name: 🧱 Build vendor image only
         run: |
           cd ~/aosp-repo
           source build/envsetup.sh || true
+          export TARGET_PRODUCT=beryllium
+          export TARGET_BUILD_VARIANT=userdebug
+          echo "🚧 Building vendor image..."
+          make vendorimage -j$(nproc) || make -j$(nproc)
 
-          echo "🔧 Generating makefiles..."
-          lunch beryllium-userdebug || true
-
-          echo "⚙️ Building vendor image..."
-          make vendorimage -j$(nproc)
-
-      - name: 📦 Collect build artifacts
-        run: |
-          mkdir -p $GITHUB_WORKSPACE/output
-          cp -a ~/aosp-repo/out/target/product/beryllium/vendor.img $GITHUB_WORKSPACE/output/vendor.img || true
-
-      - name: 🚀 Upload vendor image
+      - name: 📦 Upload vendor.img artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vendor-beryllium
-          path: output/vendor.img
+          name: vendor-image-beryllium
+          path: ~/aosp-repo/out/target/product/beryllium/vendor.img

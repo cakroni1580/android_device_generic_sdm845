@@ -18,23 +18,23 @@ jobs:
           git gnupg gperf libxml2-utils make python3 rsync unzip zip zlib1g-dev
 
 
-    - name: 🧩 Prepare AOSP tree
+    - name: Setup minimal AOSP tree
       run: |
-        mkdir -p ~/aosp
-        cd ~/aosp
+       mkdir -p ~/aosp
+       cd ~/aosp
 
-        echo "📦 Cloning essential AOSP components..."
-        git clone --depth=1 https://android.googlesource.com/platform/build build
-        git clone --depth=1 https://android.googlesource.com/platform/build/make make
-        git clone --depth=1 https://android.googlesource.com/platform/system/core system/core
+       echo "📦 Cloning essential AOSP components..."
+       git clone --depth=1 https://android.googlesource.com/platform/build build
+       git clone --depth=1 https://android.googlesource.com/platform/build/make make
+       git clone --depth=1 https://android.googlesource.com/platform/system/core system/core
 
-        echo "📁 Copying local device tree..."
-        mkdir -p device/generic
-        cp -r $GITHUB_WORKSPACE device/generic/sdm845
+       echo "📁 Copying local device tree..."
+       mkdir -p device/generic
+       cp -r $GITHUB_WORKSPACE device/generic/sdm845
 
-        echo "📁 Setting up minimal vendor tree..."
-        mkdir -p vendor/generic
-        touch vendor/generic/Android.mk
+       echo "📁 Setting up minimal vendor tree..."
+       mkdir -p vendor/generic
+       touch vendor/generic/Android.mk
 
     - name: ⚙️ Build vendor image
       run: |
